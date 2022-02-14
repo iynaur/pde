@@ -16,7 +16,7 @@ ccol = 200
 testdir = './test'
 flist = os.listdir(testdir)
 img = cv2.imread(os.path.join(testdir, flist[0]), cv2.IMREAD_GRAYSCALE)
-
+img = cv2.GaussianBlur(img, (5, 5), 3)
 resize = 0
 if resize :
     img = cv2.resize(img, (ccol + 2, crow + 2))
@@ -76,7 +76,7 @@ def Nxt(u, d, w = 1.0):
         Lap_u[i, 0] = 2*Lap_u[i, 1] - Lap_u[i, 2]
         Lap_u[i, -1] = 2*Lap_u[i, -2] - Lap_u[i, -3]
 
-    # coners
+    # corners
     Lap_u[0,0] = Lap_u[0,1] + Lap_u[1,0] - Lap_u[1,1]
     Lap_u[0,-1] = Lap_u[0,-2] + Lap_u[1,-1] - Lap_u[1,-2]
     Lap_u[-1,0] = Lap_u[-1,1] + Lap_u[-2,0] - Lap_u[-2,1]
