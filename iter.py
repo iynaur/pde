@@ -76,26 +76,30 @@ def Nxt(u, d, w = 1.0):
     # 对中间点的五点法处理
     # crop 1 pixel
     Lap_u = np.zeros((crow, ccol))
-    Lap_u[1:-1, 1:-1] = b[1:-1, 1:-1]*(u[2:, 1:-1] + u[:-2, 1:-1]) \
-            + a[1:-1, 1:-1]*(u[1:-1, 2:] + u[1:-1, :-2]) + d[1:-1, 1:-1]
+    for i in range(0, crow):
+        for j in range(0, ccol):
+            Lap_u[i,j] = b[i, j]*(u[(i+1)%crow, j] + u[i-1, j]) \
+            + a[i,j]*(u[i, (j+1)%ccol] + u[i, j-1]) + d[i, j]
+
+            # Lap_u[i,j] /= (2*a[i,j] + 2*b[i,j] + c[i,j])
     # 对边界点处理
 
-    #  up and down edge
-    for i in range(1, ccol-1):
-        Lap_u[0, i] = 2*Lap_u[1,i] - Lap_u[2,i]
-        Lap_u[ - 1, i] = 2*Lap_u[ - 2,i] - Lap_u[-3,i]
-    # left and right
-    for i in range(1, crow-1):
-        Lap_u[i, 0] = 2*Lap_u[i, 1] - Lap_u[i, 2]
-        Lap_u[i, -1] = 2*Lap_u[i, -2] - Lap_u[i, -3]
+    # #  up and down edge
+    # for i in range(1, ccol-1):
+    #     Lap_u[0, i] = 2*Lap_u[1,i] - Lap_u[2,i]
+    #     Lap_u[ - 1, i] = 2*Lap_u[ - 2,i] - Lap_u[-3,i]
+    # # left and right
+    # for i in range(1, crow-1):
+    #     Lap_u[i, 0] = 2*Lap_u[i, 1] - Lap_u[i, 2]
+    #     Lap_u[i, -1] = 2*Lap_u[i, -2] - Lap_u[i, -3]
 
-    # corners
-    Lap_u[0,0] = Lap_u[0,1] + Lap_u[1,0] - Lap_u[1,1]
-    Lap_u[0,-1] = Lap_u[0,-2] + Lap_u[1,-1] - Lap_u[1,-2]
-    Lap_u[-1,0] = Lap_u[-1,1] + Lap_u[-2,0] - Lap_u[-2,1]
-    Lap_u[-1,-1] = Lap_u[-1,-2] + Lap_u[-2,-1] - Lap_u[-2,-2]
+    # # corners
+    # Lap_u[0,0] = Lap_u[0,1] + Lap_u[1,0] - Lap_u[1,1]
+    # Lap_u[0,-1] = Lap_u[0,-2] + Lap_u[1,-1] - Lap_u[1,-2]
+    # Lap_u[-1,0] = Lap_u[-1,1] + Lap_u[-2,0] - Lap_u[-2,1]
+    # Lap_u[-1,-1] = Lap_u[-1,-2] + Lap_u[-2,-1] - Lap_u[-2,-2]
 
-    # 略
+    # # 略
     Lap_u = Lap_u / (2*a + 2*b + c)
     # return Lap_u # w = 1
     ndiff = Lap_u - u
@@ -106,7 +110,8 @@ def Nxt(u, d, w = 1.0):
 def Nxt_SOR(u, d, w = 1.0):
     # 对中间点的五点法处理
     # crop 1 pixel
-    Lap_u = u.copy()
+    ogu = u.copy()
+    Lap_u = u #.copy()
     # for i in range(1, row-1):
     #     for j in range(1, col - 1):
     for i in range(0, crow):
@@ -135,23 +140,23 @@ def Nxt_SOR(u, d, w = 1.0):
     # 略
     
     # return Lap_u # w = 1
-    ndiff = Lap_u - u
+    ndiff = Lap_u - ogu
     crop = 4
     diff = np.max(np.fabs(ndiff[crop:-crop, crop:-crop]))
-    return u + w * ndiff, diff
+    return ogu + w * ndiff, diff
 
 if __name__ == "__main__":
 
     diff_cmp = []
     diffs_sor_cmp = []
-    for w in np.linspace(0.5, 0.99, num=2): # w > 1 may converge then diverge
+    for w in np.linspace(1.2, 1.2, num=1): # w > 1 may converge then diverge
         diffs = []
         diffs_sor = []
         ux = np.zeros((crow, ccol))
         uy = np.zeros((crow, ccol))
-        for iter in range(30):
-            ux, diff= Nxt(ux, dx, w)
-            uy, _ = Nxt_SOR(uy, dy, w)
+        for iter in range(50):
+            ux, diff= Nxt(ux, dx, w = 1.0)
+            uy, _ = Nxt_SOR(uy, dx, w = 1.5)
             diffs.append(diff)
             diffs_sor.append(_)
         diff_cmp.append(diffs)
@@ -172,7 +177,8 @@ if __name__ == "__main__":
     for i, u in enumerate([ux, uy]):
         plt.subplot(1, 3, i+1)
 
-        fig = plt.imshow(u)
+        if i: fig = plt.imshow(u)
+        else: fig = plt.imshow(ux - uy)
 
         # ax3 = plt.axes(projection='3d')
         # plt.plot_surface(X, Y, u, cmap='rainbow')
