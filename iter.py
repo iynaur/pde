@@ -13,7 +13,7 @@ import sys, os
 # i, j for ith row, jth col
 crow = 50
 ccol = 50
-if 0:
+if 1:
     testdir = './test'
     flist = os.listdir(testdir)
     img = cv2.imread(os.path.join(testdir, flist[0]), cv2.IMREAD_GRAYSCALE)
@@ -22,7 +22,7 @@ if 0:
     if resize :
         img = cv2.resize(img, (ccol + 2, crow + 2))
     else:
-        # img = img[:ccol + 2, :crow+2]
+        img = img[:ccol + 2, :crow+2]
         crow = img.shape[0] - 2
         ccol = img.shape[1] - 2
 else:
@@ -63,7 +63,7 @@ def gdy(i, j):
 def d(i, j):
     # return fabs(i - crow/2) + fabs(j - ccol/2)
     return \
-        2*(float)(img[i+1,j+1])
+        (float)(img[i+1,j+1])
 
 a = np.zeros((crow, ccol))
 b = np.zeros((crow, ccol))
@@ -152,8 +152,35 @@ def Nxt_SOR(u, d, w = 1.0):
     diff = np.max(np.fabs(ndiff[crop:-crop, crop:-crop]))
     return ogu + w * ndiff, diff
 
-def fftSolver(f):
+def fftSolver(f = None, dx= None):
+    assert((f is None) ^ (dx is None))
+    if f is not None: # input raw f
+        m = f.shape[0]
+        n = f.shape[1]
+        cf = np.fft.fft2(f)
+        cd = np.zeros(f.shape, dtype = complex)
+        for i in range(f.shape[0]):
+            for j in range(f.shape[1]):
+                # this is crucial
+                ni = min(i, m-i)
+                nj = min(j, n-j)
+                rq = j if (j < (n-j)) else j - n
+                if fabs(rq) > n/2 * 0.5:
+                    # rq = 0
+                    pass
+                cd[i, j] = 2 *pi * rq * (0+1j) / n *cf[i,j]
+
+                cf[i, j] = 2 *pi * rq * (0+1j) / n / \
+                (a[i,j]*(2*pi*ni/m)**2 + b[i,j]*(2*pi*nj/n)**2 + c[i,j]) * cf[i,j]
+
+        rfft = np.fft.ifft2(cd)
+        plt.imshow(np.real(rfft))
+        plt.show()
+        u = np.fft.ifft2(cf)
+        return np.real(u)
     I = 0+1j
+
+    f = dx
     cu = np.zeros(f.shape, dtype = complex)
     cf = np.fft.fft2(f)
     m = f.shape[0]
@@ -181,8 +208,8 @@ if __name__ == "__main__":
         ux = np.zeros((crow, ccol))
         uy = np.zeros((crow, ccol))
         for iter in range(300):
-            ux, diff= Nxt(ux, f, w = 1.0)
-            uy, _ = Nxt_SOR(uy, f, w = 1.5)
+            ux, diff= Nxt(ux, dx, w = 1.0)
+            uy, _ = Nxt_SOR(uy, dx, w = 1.5)
             diffs.append(diff)
             diffs_sor.append(_)
         diff_cmp.append(diffs)
@@ -199,16 +226,17 @@ if __name__ == "__main__":
         plt.show()
 
 
-    uz = fftSolver(f)
-    for i, u in enumerate([ux, uy, uz, ]):
-        plt.subplot(1, 3, i+1)
+    uz = fftSolver(f = f)
+    ud = fftSolver(dx = dx)
+    for i, u in enumerate([ux, uy, uz, ud]):
+        plt.subplot(1, 4, i+1)
 
         if 0: fig = plt.imshow(np.real(u - ux))
-        else: fig = plt.imshow(np.real(u))
+        else: fig = plt.imshow(np.real(u - uy))
 
         # ax3 = plt.axes(projection='3d')
         # plt.plot_surface(X, Y, u, cmap='rainbow')
-        plt.contour(X, Y, u, colors='black')   #等高线图，要设置offset，为Z的最小值
+        # plt.contour(X, Y, u, colors='black')   #等高线图，要设置offset，为Z的最小值
         # b = plt.contour(X, Y, u, 3, colors='black', linewidths=1, linestyles='solid')
         plt.colorbar(fig)
         fig.set_cmap('jet') # 'plasma' or 'viridis'
