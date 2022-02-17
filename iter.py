@@ -11,14 +11,14 @@ import sys, os
 # a * du2 / d2x + b * du2 / d2y - c *u + d = 0
 
 # i, j for ith row, jth col
-crow = 200
-ccol = 200
+crow = 50
+ccol = 50
 if 0:
     testdir = './test'
     flist = os.listdir(testdir)
     img = cv2.imread(os.path.join(testdir, flist[0]), cv2.IMREAD_GRAYSCALE)
     img = cv2.GaussianBlur(img, (5, 5), 3)
-    resize = 0
+    resize = 1
     if resize :
         img = cv2.resize(img, (ccol + 2, crow + 2))
     else:
@@ -29,12 +29,14 @@ else:
     img = np.zeros((crow + 2, ccol + 2))
     for row in range(crow + 2):
         for col in range(ccol + 2):
-            img[row, col] = fabs(row - crow/2 -1) + fabs(col - ccol/2 -1)
+            img[row, col] = 2*4*pi**2/crow/ccol*cos((row-1)/(crow)*2*pi)*cos((col-1)/(ccol)*2*pi)
     pass
-    img /= np.max(img)
+    # img /= np.max(img)
 
 # cv2.imshow("", img)
 # cv2.waitKey()
+plt.imshow(img)
+plt.show()
 
 def ga(i, j):
     return 1
@@ -43,12 +45,12 @@ def gb(i, j):
     return 1
 
 def gc(i, j):
-    return 1
+    return 2*4*pi**2/crow/ccol
 
 def gdx(i, j):
     # return fabs(i - crow/2) + fabs(j - ccol/2)
     return \
-        (float)(img[i,j]) - img[i,j+2]
+        -((float)(img[i+1,j]) - img[i+1,j+2])/2
     #     (i- crow / 2)  \
     # +  ccol**2/((j- ccol / 2) **2 +1)
     # return 1
@@ -56,16 +58,21 @@ def gdx(i, j):
 def gdy(i, j):
     # return fabs(i - crow/2) + fabs(j - ccol/2)
     return \
-        (float)(img[i,j]) - img[i+2,j]
+        -((float)(img[i,j+1]) - img[i+2,j+1])/2
+
+def d(i, j):
+    # return fabs(i - crow/2) + fabs(j - ccol/2)
+    return \
+        2*(float)(img[i+1,j+1])
 
 a = np.zeros((crow, ccol))
 b = np.zeros((crow, ccol))
 c = np.zeros((crow, ccol))
 dx = np.zeros((crow, ccol))
 dy = np.zeros((crow, ccol))
-
-mats = [a,b,c,dx, dy]
-funcs = [ga, gb, gc, gdx, gdy]
+f = np.zeros((crow, ccol))
+mats = [a,b,c,dx, dy, f]
+funcs = [ga, gb, gc, gdx, gdy, d]
 
 for mat, func in zip(mats, funcs):
     for row in range(crow):
@@ -138,12 +145,31 @@ def Nxt_SOR(u, d, w = 1.0):
     # Lap_u[-1,-1] = Lap_u[-1,-2] + Lap_u[-2,-1] - Lap_u[-2,-2]
 
     # 略
-    
+
     # return Lap_u # w = 1
     ndiff = Lap_u - ogu
     crop = 4
     diff = np.max(np.fabs(ndiff[crop:-crop, crop:-crop]))
     return ogu + w * ndiff, diff
+
+def fftSolver(f):
+    I = 0+1j
+    cu = np.zeros(f.shape, dtype = complex)
+    cf = np.fft.fft2(f)
+    m = f.shape[0]
+    n = f.shape[1]
+    for i in range(f.shape[0]):
+        for j in range(f.shape[1]):
+            # this is crucial
+            ni = min(i, m-i)
+            nj = min(j, n-j)
+            cu[i, j] = 1 / \
+            (a[i,j]*(2*pi*ni/m)**2 + b[i,j]*(2*pi*nj/n)**2 + c[i,j]) * cf[i,j]
+    # cu[0][0] = 0
+    u = np.fft.ifft2(cu)
+    return np.real(u)
+
+
 
 if __name__ == "__main__":
 
@@ -154,31 +180,31 @@ if __name__ == "__main__":
         diffs_sor = []
         ux = np.zeros((crow, ccol))
         uy = np.zeros((crow, ccol))
-        for iter in range(50):
-            ux, diff= Nxt(ux, dx, w = 1.0)
-            uy, _ = Nxt_SOR(uy, dx, w = 1.5)
+        for iter in range(300):
+            ux, diff= Nxt(ux, f, w = 1.0)
+            uy, _ = Nxt_SOR(uy, f, w = 1.5)
             diffs.append(diff)
             diffs_sor.append(_)
         diff_cmp.append(diffs)
         diffs_sor_cmp.append(diffs_sor)
 
-    
+
     X, Y = np.meshgrid(range(ccol), range(crow))
     if 0:
         crop = 10
         scale = np.max(ux[crop:-crop, crop:-crop])*1.5
-        
+
         plt.imshow(ux**2 + uy**2)
         plt.quiver(X, Y, ux/scale, uy/scale, angles='xy', scale_units='xy', scale=1)
         plt.show()
 
 
-
-    for i, u in enumerate([ux, uy]):
+    uz = fftSolver(f)
+    for i, u in enumerate([ux, uy, uz, ]):
         plt.subplot(1, 3, i+1)
 
-        if i: fig = plt.imshow(u)
-        else: fig = plt.imshow(ux - uy)
+        if 0: fig = plt.imshow(np.real(u - ux))
+        else: fig = plt.imshow(np.real(u))
 
         # ax3 = plt.axes(projection='3d')
         # plt.plot_surface(X, Y, u, cmap='rainbow')
@@ -186,8 +212,8 @@ if __name__ == "__main__":
         # b = plt.contour(X, Y, u, 3, colors='black', linewidths=1, linestyles='solid')
         plt.colorbar(fig)
         fig.set_cmap('jet') # 'plasma' or 'viridis'
-    # plt.show()
-    # exit(0)
+    plt.show()
+    exit(0)
     plt.subplot(133)
     for diffs in diff_cmp:
         plt.plot(diffs)
