@@ -13,8 +13,8 @@ import sys, os
 # a * du2 / d2x + b * du2 / d2y - c *u + d = 0
 
 # i, j for ith row, jth col
-crow = 20
-ccol = 20
+crow = 40
+ccol = 40
 if 1:
     testdir = './test'
     flist = os.listdir(testdir)
@@ -62,7 +62,7 @@ plt.show()
 # plt.imshow(np.real(rfft))
 # plt.show()
 # exit()
-ups = 5
+ups = 4
 rfft = np.zeros((crow * ups, ccol * ups), np.complex)
 om = cmath.exp(2*pi/crow * (0+1j) )
 on = cmath.exp(2*pi/ccol * (0+1j) )
@@ -75,8 +75,10 @@ for ii in range(0, crow* ups, 1):
         j = jj/ups
         for p in range(crow):
             for q in range(ccol):
-
-                    rfft[ii, jj] += fft[p, q] * om ** (p*i) * on ** (q*j)
+                # better interpolate
+                    nnp = p if p < crow -p else p - crow
+                    nq = q if q<  ccol - q else q - ccol
+                    rfft[ii, jj] += fft[p, q] * om ** (nnp*i) * on ** (nq*j)
 
 
 plt.imshow(np.real(rfft/crow/ccol))
