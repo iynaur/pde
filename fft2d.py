@@ -76,7 +76,7 @@ import numba
 @numba.jit(nogil=True)
 def proc(ii):
     i = ii/ups
-    rfft = np.zeros(ccol* ups, dtype=complex)
+    rfft = np.zeros(ccol* ups, dtype=np.complex_)
     for jj in range(0, ccol* ups, 1):
         j = jj/ups
         for p in range(crow):
