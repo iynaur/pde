@@ -1,4 +1,5 @@
 
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from math import *
 import cmath
 from typing import NoReturn
@@ -70,7 +71,9 @@ N = 8
 validrow = [i for i in range(crow) if fabs(i - crow/2) > crow/8]
 validcol = [i for i in range(ccol) if fabs(i - ccol/2) > ccol/8]
 
+import numba
 
+@numba.jit(nogil=True)
 def proc(ii):
     i = ii/ups
     rfft = np.zeros(ccol* ups, dtype=complex)
@@ -86,12 +89,15 @@ def proc(ii):
 
 if __name__ == "__main__":
     if 1:
-        pool = Pool(processes = 7)
-        result = pool.map(proc, range(0, crow* ups, 1))
-        pool.close()
-        pool.join()
+        with ThreadPoolExecutor(max_workers=4) as executor:
+            future = executor.map(proc, range(0, crow* ups, 1))
+            # result = [f.result() for f in future]
+            # print(result)
+            #     result = pool.map(proc, range(0, crow* ups, 1))
+            #     pool.close()
+            #     pool.join()
 
-        rfft  = np.array(result)
+        rfft  = np.array(list(future))
 
 
     else:
@@ -102,11 +108,11 @@ if __name__ == "__main__":
                 for p in range(crow):
                     for q in range(ccol):
                         # better interpolate
-                            nnp = p if p < crow -p else p - crow
-                            nq = q if q<  ccol - q else q - ccol
-                            rfft[ii, jj] += fft[p, q] * om ** (nnp*i) * on ** (nq*j)
+                        nnp = p if p < crow -p else p - crow
+                        nq = q if q<  ccol - q else q - ccol
+                        rfft[ii, jj] += fft[p, q] * om ** (nnp*i) * on ** (nq*j)
     plt.imshow(np.real(rfft/crow/ccol))
     plt.show()
 
-    plt.imshow(np.abs(rfft/crow/ccol))
+    plt.imshow(np.imag(rfft/crow/ccol))
     plt.show()
