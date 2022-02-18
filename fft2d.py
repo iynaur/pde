@@ -5,6 +5,7 @@ import cmath
 from typing import NoReturn
 import numpy as np
 import matplotlib.pyplot as plt
+plt.switch_backend('Qt5Agg')
 
 import cv2
 import sys, os
@@ -25,9 +26,9 @@ if 1:
     if resize :
         img = cv2.resize(img, (ccol, crow))
     else:
-        img = img[:crow , :ccol]
-        # crow = img.shape[0]
-        # ccol = img.shape[1]
+        # img = img[:crow , :ccol]
+        crow = img.shape[0]
+        ccol = img.shape[1]
     # img = cv2.GaussianBlur(img, (5, 5), 3)
 else:
     abl = [[1,1], [3,5], [4,7]]
@@ -88,6 +89,13 @@ def proc(ii):
     return rfft
 
 if __name__ == "__main__":
+    from util import partialx_fft, ifft_ups
+    pfft = partialx_fft(img)
+    rfft = ifft_ups(pfft, ups)
+    plt.imshow(np.real(rfft))
+    plt.show(block=1)
+    # plt.close()
+    # exit()
     if 1:
         with ThreadPoolExecutor(max_workers=4) as executor:
             future = executor.map(proc, range(0, crow* ups, 1))
@@ -112,7 +120,7 @@ if __name__ == "__main__":
                         nq = q if q<  ccol - q else q - ccol
                         rfft[ii, jj] += fft[p, q] * om ** (nnp*i) * on ** (nq*j)
     plt.imshow(np.real(rfft/crow/ccol))
-    plt.show()
+    plt.show(block=1)
 
     plt.imshow(np.imag(rfft/crow/ccol))
-    plt.show()
+    plt.show(block=1)
