@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 
 import cv2
 import sys, os
-
+from multiprocessing import Pool
 
 
 # a * du2 / d2x + b * du2 / d2y - c *u + d = 0
@@ -37,17 +37,17 @@ else:
                 img[row, col] += 2*4*pi**2/crow/ccol*cos(ab[0]*row/(crow)*2*pi)*cos(ab[1]*col/(ccol)*2*pi)
 
 
-plt.imshow(img)
-plt.show()
+# plt.imshow(img)
+# plt.show()
 
 fft = np.fft.fft2(img)
 rfft = np.fft.ifft2(fft)
 
-plt.imshow(np.abs(fft))
-plt.show()
-rfft = np.fft.ifft2(fft)
-plt.imshow(np.real(rfft))
-plt.show()
+# plt.imshow(np.abs(fft))
+# plt.show()
+# rfft = np.fft.ifft2(fft)
+# plt.imshow(np.real(rfft))
+# plt.show()
 
 # print(fft)
 # for p in range(crow):
@@ -69,8 +69,11 @@ on = cmath.exp(2*pi/ccol * (0+1j) )
 N = 8
 validrow = [i for i in range(crow) if fabs(i - crow/2) > crow/8]
 validcol = [i for i in range(ccol) if fabs(i - ccol/2) > ccol/8]
-for ii in range(0, crow* ups, 1):
+
+
+def proc(ii):
     i = ii/ups
+    rfft = np.zeros(ccol* ups, dtype=complex)
     for jj in range(0, ccol* ups, 1):
         j = jj/ups
         for p in range(crow):
@@ -78,11 +81,32 @@ for ii in range(0, crow* ups, 1):
                 # better interpolate
                     nnp = p if p < crow -p else p - crow
                     nq = q if q<  ccol - q else q - ccol
-                    rfft[ii, jj] += fft[p, q] * om ** (nnp*i) * on ** (nq*j)
+                    rfft[jj] += fft[p, q] * om ** (nnp*i) * on ** (nq*j)
+    return rfft
+
+if __name__ == "__main__":
+    if 1:
+        pool = Pool(processes = 7)
+        result = pool.map(proc, range(0, crow* ups, 1))
+        pool.close()
+        pool.join()
+
+        rfft  = np.array(result)
 
 
-plt.imshow(np.real(rfft/crow/ccol))
-plt.show()
+    else:
+        for ii in range(0, crow* ups, 1):
+            i = ii/ups
+            for jj in range(0, ccol* ups, 1):
+                j = jj/ups
+                for p in range(crow):
+                    for q in range(ccol):
+                        # better interpolate
+                            nnp = p if p < crow -p else p - crow
+                            nq = q if q<  ccol - q else q - ccol
+                            rfft[ii, jj] += fft[p, q] * om ** (nnp*i) * on ** (nq*j)
+    plt.imshow(np.real(rfft/crow/ccol))
+    plt.show()
 
-plt.imshow(np.abs(rfft/crow/ccol))
-plt.show()
+    plt.imshow(np.abs(rfft/crow/ccol))
+    plt.show()
