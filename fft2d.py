@@ -13,14 +13,14 @@ import sys, os
 # a * du2 / d2x + b * du2 / d2y - c *u + d = 0
 
 # i, j for ith row, jth col
-crow = 50
-ccol = 50
+crow = 20
+ccol = 20
 if 1:
     testdir = './test'
     flist = os.listdir(testdir)
     img = cv2.imread(os.path.join(testdir, flist[0]), cv2.IMREAD_GRAYSCALE)
 
-    resize = 0
+    resize = 1
     if resize :
         img = cv2.resize(img, (ccol, crow))
     else:
@@ -50,30 +50,37 @@ plt.imshow(np.real(rfft))
 plt.show()
 
 # print(fft)
-for p in range(crow):
-    for q in range(ccol):
-        rq = q if (q < (ccol-q)) else q - ccol
-        if fabs(rq) > ccol/2 * 0.5:
-            rq = 0
-        # rp = p
-        fft[p, q] = fft[p, q] * 2 *pi * rq * (0+1j) / crow
-rfft = np.fft.ifft2(fft)
-plt.imshow(np.real(rfft))
-plt.show()
-exit()
-rfft = np.zeros((crow, ccol), np.complex)
+# for p in range(crow):
+#     for q in range(ccol):
+#         rq = q if (q < (ccol-q)) else q - ccol
+#         if fabs(rq) > ccol/2 * 0.5:
+#             # rq = 0
+#             pass
+#         # rp = p
+#         fft[p, q] = fft[p, q] * 2 *pi * rq * (0+1j) / crow
+# rfft = np.fft.ifft2(fft)
+# plt.imshow(np.real(rfft))
+# plt.show()
+# exit()
+ups = 5
+rfft = np.zeros((crow * ups, ccol * ups), np.complex)
 om = cmath.exp(2*pi/crow * (0+1j) )
 on = cmath.exp(2*pi/ccol * (0+1j) )
 N = 8
 validrow = [i for i in range(crow) if fabs(i - crow/2) > crow/8]
 validcol = [i for i in range(ccol) if fabs(i - ccol/2) > ccol/8]
-for i in range(crow):
-    for j in range(ccol):
+for ii in range(0, crow* ups, 1):
+    i = ii/ups
+    for jj in range(0, ccol* ups, 1):
+        j = jj/ups
         for p in range(crow):
             for q in range(ccol):
 
-                    rfft[i, j] += fft[p, q] * om ** (p*i) * on ** (q*j) * 2 *pi * p * (0+1j) / crow
+                    rfft[ii, jj] += fft[p, q] * om ** (p*i) * on ** (q*j)
 
 
 plt.imshow(np.real(rfft/crow/ccol))
+plt.show()
+
+plt.imshow(np.abs(rfft/crow/ccol))
 plt.show()

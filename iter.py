@@ -25,6 +25,10 @@ if 1:
         img = img[:ccol + 2, :crow+2]
         crow = img.shape[0] - 2
         ccol = img.shape[1] - 2
+    top, bottom, left, right = 4,4,4,4
+    # img = cv2.copyMakeBorder(img, top, bottom, left, right, cv2.BORDER_CONSTANT)
+    crow = img.shape[0] - 2
+    ccol = img.shape[1] - 2
 else:
     img = np.zeros((crow + 2, ccol + 2))
     for row in range(crow + 2):
@@ -231,7 +235,7 @@ if __name__ == "__main__":
     for i, u in enumerate([ux, uy, uz, ud]):
         plt.subplot(1, 4, i+1)
 
-        if 0: fig = plt.imshow(np.real(u - ux))
+        if 1: fig = plt.imshow(np.real(u))
         else: fig = plt.imshow(np.real(u - uy))
 
         # ax3 = plt.axes(projection='3d')
