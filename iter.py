@@ -87,47 +87,63 @@ for mat, func in zip(mats, funcs):
 
 import numba
 
-def Nxt_solver(dx, iter = 100, w = 1.0,):
+@numba.jit(nogil=True)
+def proc2(i, Lap_u, u):
+    w = 1.0
+    # print(w)
+    for j in range(0, ccol):
+        # for k in range(j**2):
+        #     Lap_u[i,j] += j
+        nu = b[i, j]*(u[(i+1)%crow, j] + u[i-1, j]) \
+        + a[i,j]*(u[i, (j+1)%ccol] + u[i, j-1]) + dx[i, j]
+        nu /= (2*a[i, j] + 2*b[i, j] + c[i, j])
+        diff = nu - u[i, j]
+        Lap_u[i,j] = u[i, j] + w*diff
+
+@numba.jit(nogil=True, nopython = True)
+def Nxt_solver(iter = 100, ):
+    w = 1.0
     # 对中间点的五点法处理
     # crop 1 pixel
     Lap_u = np.zeros((crow, ccol))
     u = np.zeros((crow, ccol))
     # diff = np.zeros((crow, ccol))
-    diffs = []
+    # diffs = []
 
-    @numba.jit(nogil=True)
-    def proc2(i, Lap_u, u):
-        for j in range(0, ccol):
-            # for k in range(j**2):
-            #     Lap_u[i,j] += j
-            nu = b[i, j]*(u[(i+1)%crow, j] + u[i-1, j]) \
-            + a[i,j]*(u[i, (j+1)%ccol] + u[i, j-1]) + dx[i, j]
-            nu /= (2*a[i, j] + 2*b[i, j] + c[i, j])
-            diff = nu - u[i, j]
-            Lap_u[i,j] = u[i, j] + w*diff
+
 
     for i in range(iter):
         # u[:] = Lap_u
         if 0: # ThreadPoolExecutor slower for small jobs
-            with ThreadPoolExecutor(max_workers=4) as executor:
-                _ = executor.map(proc2, range(0, crow), repeat(Lap_u), repeat(u))
-            # _ = list(_)
+            # with ThreadPoolExecutor(max_workers=4) as executor:
+            #     _ = executor.map(proc2, range(0, crow), repeat(Lap_u), repeat(u))
+            # # _ = list(_)
+            pass
         else:
             for i in range(0, crow):
                 proc2(i, Lap_u, u)
+                continue
+                for j in range(0, ccol):
+                # for k in range(j**2):
+                #     Lap_u[i,j] += j
+                    nu = b[i, j]*(u[(i+1)%crow, j] + u[i-1, j]) \
+                    + a[i,j]*(u[i, (j+1)%ccol] + u[i, j-1]) + dx[i, j]
+                    nu /= (2*a[i, j] + 2*b[i, j] + c[i, j])
+                    diff = nu - u[i, j]
+                    Lap_u[i,j] = u[i, j] + w*diff
             #
         u[:] = Lap_u
         continue
 
-        Lap_u = Lap_u / (2*a + 2*b + c)
-        # return Lap_u # w = 1
-        ndiff = Lap_u - u
-        crop = 4
-        diff = np.max(np.fabs(ndiff[crop:-crop, crop:-crop]))
-        diffs.append(diff)
-        # u, Lap_u = Lap_u, u
+        # Lap_u = Lap_u / (2*a + 2*b + c)
+        # # return Lap_u # w = 1
+        # ndiff = Lap_u - u
+        # crop = 4
+        # diff = np.max(np.fabs(ndiff[crop:-crop, crop:-crop]))
+        # diffs.append(diff)
+        # # u, Lap_u = Lap_u, u
 
-    return Lap_u, diffs
+    return Lap_u, None
 
 def SOR_solver(dx, iter = 100, w = 1.0,):
     # 对中间点的五点法处理
@@ -274,7 +290,7 @@ if __name__ == "__main__":
             uy, _ = Nxt_SOR(uy, dx, w = 1.5)
             # diffs.append(diff)
             diffs_sor.append(_)
-        ux, diffs = Nxt_solver(dx, 3600)
+        ux, diffs = Nxt_solver( 3600)
         uy, _ = SOR_solver( dx, 400, w = 1.7)
         diff_cmp.append(diffs)
         diffs_sor_cmp.append(diffs_sor)
