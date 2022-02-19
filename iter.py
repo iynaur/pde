@@ -1,18 +1,20 @@
+from itertools import repeat
 from math import *
 from typing import NoReturn
 import numpy as np
 import matplotlib.pyplot as plt
+plt.switch_backend('Qt5Agg')
 
 import cv2
 import sys, os
 
-
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 
 # a * du2 / d2x + b * du2 / d2y - c *u + d = 0
 
 # i, j for ith row, jth col
-crow = 50
-ccol = 50
+crow = 300
+ccol = 300
 if 1:
     testdir = './test'
     flist = os.listdir(testdir)
@@ -39,8 +41,8 @@ else:
 
 # cv2.imshow("", img)
 # cv2.waitKey()
-plt.imshow(img)
-plt.show()
+# plt.imshow(img)
+# plt.show()
 
 def ga(i, j):
     return 1
@@ -69,54 +71,110 @@ def d(i, j):
     return \
         (float)(img[i+1,j+1])
 
-a = np.zeros((crow, ccol))
-b = np.zeros((crow, ccol))
-c = np.zeros((crow, ccol))
+a = np.ones((crow, ccol))
+b = np.ones((crow, ccol))
+c = np.ones((crow, ccol)) / 1000
 dx = np.zeros((crow, ccol))
-dy = np.zeros((crow, ccol))
-f = np.zeros((crow, ccol))
-mats = [a,b,c,dx, dy, f]
-funcs = [ga, gb, gc, gdx, gdy, d]
+dy = np.ones((crow, ccol))
+f = np.ones((crow, ccol))
+mats = [dx]
+funcs = [gdx, ]
 
 for mat, func in zip(mats, funcs):
     for row in range(crow):
         for col in range(ccol):
             mat[row, col] = func(row, col)
 
-def Nxt(u, d, w = 1.0):
+import numba
+
+def Nxt_solver(dx, iter = 100, w = 1.0,):
     # 对中间点的五点法处理
     # crop 1 pixel
     Lap_u = np.zeros((crow, ccol))
-    for i in range(0, crow):
+    u = np.zeros((crow, ccol))
+    # diff = np.zeros((crow, ccol))
+    diffs = []
+
+    @numba.jit(nogil=True)
+    def proc2(i, Lap_u, u):
         for j in range(0, ccol):
-            Lap_u[i,j] = b[i, j]*(u[(i+1)%crow, j] + u[i-1, j]) \
-            + a[i,j]*(u[i, (j+1)%ccol] + u[i, j-1]) + d[i, j]
+            # for k in range(j**2):
+            #     Lap_u[i,j] += j
+            nu = b[i, j]*(u[(i+1)%crow, j] + u[i-1, j]) \
+            + a[i,j]*(u[i, (j+1)%ccol] + u[i, j-1]) + dx[i, j]
+            nu /= (2*a[i, j] + 2*b[i, j] + c[i, j])
+            diff = nu - u[i, j]
+            Lap_u[i,j] = u[i, j] + w*diff
 
-            # Lap_u[i,j] /= (2*a[i,j] + 2*b[i,j] + c[i,j])
-    # 对边界点处理
+    for i in range(iter):
+        # u[:] = Lap_u
+        if 0: # ThreadPoolExecutor slower for small jobs
+            with ThreadPoolExecutor(max_workers=4) as executor:
+                _ = executor.map(proc2, range(0, crow), repeat(Lap_u), repeat(u))
+            # _ = list(_)
+        else:
+            for i in range(0, crow):
+                proc2(i, Lap_u, u)
+            #
+        u[:] = Lap_u
+        continue
 
-    # #  up and down edge
-    # for i in range(1, ccol-1):
-    #     Lap_u[0, i] = 2*Lap_u[1,i] - Lap_u[2,i]
-    #     Lap_u[ - 1, i] = 2*Lap_u[ - 2,i] - Lap_u[-3,i]
-    # # left and right
-    # for i in range(1, crow-1):
-    #     Lap_u[i, 0] = 2*Lap_u[i, 1] - Lap_u[i, 2]
-    #     Lap_u[i, -1] = 2*Lap_u[i, -2] - Lap_u[i, -3]
+        Lap_u = Lap_u / (2*a + 2*b + c)
+        # return Lap_u # w = 1
+        ndiff = Lap_u - u
+        crop = 4
+        diff = np.max(np.fabs(ndiff[crop:-crop, crop:-crop]))
+        diffs.append(diff)
+        # u, Lap_u = Lap_u, u
 
-    # # corners
-    # Lap_u[0,0] = Lap_u[0,1] + Lap_u[1,0] - Lap_u[1,1]
-    # Lap_u[0,-1] = Lap_u[0,-2] + Lap_u[1,-1] - Lap_u[1,-2]
-    # Lap_u[-1,0] = Lap_u[-1,1] + Lap_u[-2,0] - Lap_u[-2,1]
-    # Lap_u[-1,-1] = Lap_u[-1,-2] + Lap_u[-2,-1] - Lap_u[-2,-2]
+    return Lap_u, diffs
 
-    # # 略
-    Lap_u = Lap_u / (2*a + 2*b + c)
-    # return Lap_u # w = 1
-    ndiff = Lap_u - u
-    crop = 4
-    diff = np.max(np.fabs(ndiff[crop:-crop, crop:-crop]))
-    return u + w * ndiff, diff
+def SOR_solver(dx, iter = 100, w = 1.0,):
+    # 对中间点的五点法处理
+    # crop 1 pixel
+    u = np.zeros((crow, ccol))
+    # diff = np.zeros((crow, ccol))
+    diffs = []
+
+    @numba.jit(nogil=True)
+    def proc(i, u, even):
+        # assert( i % 2 == 0 and ccol % 2 == 0)
+        for j in range((even+i)%2, ccol, 2):
+            # for k in range(j**2):
+            #     Lap_u[i,j] += j
+            nu = b[i, j]*(u[(i+1)%crow, j] + u[i-1, j]) \
+            + a[i,j]*(u[i, (j+1)%ccol] + u[i, j-1]) + dx[i, j]
+            nu /= (2*a[i, j] + 2*b[i, j] + c[i, j])
+            diff = nu - u[i, j]
+            u[i, j] += w*diff
+
+
+    for i in range(iter):
+        # u[:] = Lap_u
+        if 0:
+            with ThreadPoolExecutor(max_workers=4) as executor:
+                _ = executor.map(proc, range(0, crow), repeat(u), repeat(0))
+            with ThreadPoolExecutor(max_workers=4) as executor:
+                _ = executor.map(proc, range(0, crow), repeat(u), repeat(1))
+            # _ = list(_)
+        else:
+            for i in range(0, crow):
+                proc(i, u, 0)
+            for i in range(0, crow):
+                proc(i, u, 1)
+            #
+        continue
+
+        Lap_u = Lap_u / (2*a + 2*b + c)
+        # return Lap_u # w = 1
+        ndiff = Lap_u - u
+        crop = 4
+        diff = np.max(np.fabs(ndiff[crop:-crop, crop:-crop]))
+        diffs.append(diff)
+        # u, Lap_u = Lap_u, u
+
+    return u, diffs
+
 
 def Nxt_SOR(u, d, w = 1.0):
     # 对中间点的五点法处理
@@ -177,9 +235,9 @@ def fftSolver(f = None, dx= None):
                 cf[i, j] = 2 *pi * rq * (0+1j) / n / \
                 (a[i,j]*(2*pi*ni/m)**2 + b[i,j]*(2*pi*nj/n)**2 + c[i,j]) * cf[i,j]
 
-        rfft = np.fft.ifft2(cd)
-        plt.imshow(np.real(rfft))
-        plt.show()
+        # rfft = np.fft.ifft2(cd)
+        # plt.imshow(np.real(rfft))
+        # plt.show()
         u = np.fft.ifft2(cf)
         return np.real(u)
     I = 0+1j
@@ -211,11 +269,13 @@ if __name__ == "__main__":
         diffs_sor = []
         ux = np.zeros((crow, ccol))
         uy = np.zeros((crow, ccol))
-        for iter in range(300):
-            ux, diff= Nxt(ux, dx, w = 1.0)
+        for iter in range(0):
+            # ux, diff= Nxt(ux, dx, w = 1.0)
             uy, _ = Nxt_SOR(uy, dx, w = 1.5)
-            diffs.append(diff)
+            # diffs.append(diff)
             diffs_sor.append(_)
+        ux, diffs = Nxt_solver(dx, 3600)
+        uy, _ = SOR_solver( dx, 400, w = 1.7)
         diff_cmp.append(diffs)
         diffs_sor_cmp.append(diffs_sor)
 
@@ -230,9 +290,9 @@ if __name__ == "__main__":
         plt.show()
 
 
-    uz = fftSolver(f = f)
+    # uz = fftSolver(f = f)
     ud = fftSolver(dx = dx)
-    for i, u in enumerate([ux, uy, uz, ud]):
+    for i, u in enumerate([ux, uy,ud]):
         plt.subplot(1, 4, i+1)
 
         if 1: fig = plt.imshow(np.real(u))
