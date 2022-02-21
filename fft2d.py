@@ -15,8 +15,8 @@ from multiprocessing import Pool
 # a * du2 / d2x + b * du2 / d2y - c *u + d = 0
 
 # i, j for ith row, jth col
-crow = 40
-ccol = 40
+crow = 300
+ccol = 300
 if 1:
     testdir = './test'
     flist = os.listdir(testdir)
@@ -90,13 +90,13 @@ def proc(ii):
 
 if __name__ == "__main__":
     from util import partialx_fft, ifft_ups
-    pfft = partialx_fft(img)
-    rfft = ifft_ups(pfft, ups)
-    plt.imshow(np.real(rfft))
-    plt.show(block=1)
+    # pfft = partialx_fft(img)
+    # rfft = ifft_ups(pfft, ups)
+    # plt.imshow(np.real(rfft))
+    # plt.show(block=1)
     # plt.close()
     # exit()
-    if 1:
+    if 0:
         with ThreadPoolExecutor(max_workers=4) as executor:
             future = executor.map(proc, range(0, crow* ups, 1))
             # result = [f.result() for f in future]
@@ -108,7 +108,7 @@ if __name__ == "__main__":
         rfft  = np.array(list(future))
 
 
-    else:
+    elif 0:
         for ii in range(0, crow* ups, 1):
             i = ii/ups
             for jj in range(0, ccol* ups, 1):
@@ -119,8 +119,20 @@ if __name__ == "__main__":
                         nnp = p if p < crow -p else p - crow
                         nq = q if q<  ccol - q else q - ccol
                         rfft[ii, jj] += fft[p, q] * om ** (nnp*i) * on ** (nq*j)
-    plt.imshow(np.real(rfft/crow/ccol))
-    plt.show(block=1)
 
-    plt.imshow(np.imag(rfft/crow/ccol))
+    # fft ups
+    upsfft = np.zeros((crow* ups, ccol* ups), dtype=np.complex_)
+    hrow = crow//2
+    hcol = ccol //2
+    upsfft[:hrow, :hcol] = fft[:hrow, :hcol]
+    upsfft[-(crow - hrow):, -(ccol - hcol):] = fft[-(crow - hrow):, -(ccol - hcol):]
+    upsfft[-(crow - hrow):, :hcol] = fft[-(crow - hrow):, :hcol]
+    upsfft[:hrow:, -(ccol - hcol):] = fft[:hrow:, -(ccol - hcol):]
+    upsrfft = np.fft.ifft2(upsfft)
+
+    plt.subplot(1, 2, 1)
+    plt.imshow(np.real(upsrfft*ups**2))
+    # plt.show(block=1)
+    plt.subplot(1, 2, 2)
+    plt.imshow(np.real(rfft/crow/ccol - upsrfft*ups**2))
     plt.show(block=1)
