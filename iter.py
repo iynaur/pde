@@ -13,8 +13,8 @@ from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 # a * du2 / d2x + b * du2 / d2y - c *u + d = 0
 
 # i, j for ith row, jth col
-crow = 400
-ccol = 400
+crow = 300
+ccol = 300
 if 1:
     testdir = './test'
     flist = os.listdir(testdir)
@@ -77,8 +77,8 @@ c = np.ones((crow, ccol)) / 1000
 dx = np.zeros((crow, ccol))
 dy = np.ones((crow, ccol))
 f = np.ones((crow, ccol))
-mats = [dx]
-funcs = [gdx, ]
+mats = [dx, f]
+funcs = [gdx, d]
 
 for mat, func in zip(mats, funcs):
     for row in range(crow):
@@ -118,9 +118,9 @@ def Nxt_solver(iter = 100, ):
     for i in range(iter):
         # u[:] = Lap_u
         if 0: # ThreadPoolExecutor slower for small jobs
-            # with ThreadPoolExecutor(max_workers=4) as executor:
-            #     _ = executor.map(proc2, range(0, crow), repeat(Lap_u), repeat(u))
-            # # _ = list(_)
+            with ThreadPoolExecutor(max_workers=1) as executor:
+                _ = executor.map(proc2, range(0, crow), repeat(Lap_u), repeat(u))
+            # _ = list(_)
             pass
         else:
             for i in range(0, crow):
@@ -150,15 +150,15 @@ def Nxt_solver(iter = 100, ):
 
 @print_durations()
 @numba.jit(nogil=True)
-def SOR_solver(dx, iter = 100, w = 1.0,):
+def SOR_solver(iter = 100, w = 1.0,):
     # 对中间点的五点法处理
     # crop 1 pixel
     u = np.zeros((crow, ccol))
     # diff = np.zeros((crow, ccol))
     # diffs = []
 
-
-    def proc(i, u, even):
+    # @numba.jit(nogil=True)
+    def proc(i, u, even, w):
         # assert( i % 2 == 0 and ccol % 2 == 0)
         for j in range((even+i)%2, ccol, 2):
             # for k in range(j**2):
@@ -180,9 +180,9 @@ def SOR_solver(dx, iter = 100, w = 1.0,):
             # _ = list(_)
         else:
             for i in range(0, crow):
-                proc(i, u, 0)
+                proc(i, u, 0, w)
             for i in range(0, crow):
-                proc(i, u, 1)
+                proc(i, u, 1, w)
             #
         continue
 
@@ -296,7 +296,7 @@ if __name__ == "__main__":
             # diffs.append(diff)
             diffs_sor.append(_)
         ux, diffs = Nxt_solver( 3600)
-        uy, _ = SOR_solver( dx, 3600, w = 1.7)
+        uy, _ = SOR_solver(3600, w = 1.7)
         diff_cmp.append(diffs)
         diffs_sor_cmp.append(diffs_sor)
 
@@ -311,12 +311,14 @@ if __name__ == "__main__":
         plt.show()
 
 
-    # uz = fftSolver(f = f)
+    uz = fftSolver(f = f) # not acurate for input image not smooth at period bondray
     ud = fftSolver(dx = dx)
-    for i, u in enumerate([ux, uy,ud]):
+    for i, u in enumerate([ux, uy, uz, ud]):
         plt.subplot(1, 4, i+1)
-
-        if 1: fig = plt.imshow(np.real(u))
+        bu = np.real(u)
+        bu = np.append(bu, bu, 0)
+        bu = np.append(bu, bu, 1)
+        if 1: fig = plt.imshow(bu)
         else: fig = plt.imshow(np.real(u - uy))
 
         # ax3 = plt.axes(projection='3d')
