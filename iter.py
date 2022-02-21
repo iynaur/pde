@@ -13,8 +13,8 @@ from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 # a * du2 / d2x + b * du2 / d2y - c *u + d = 0
 
 # i, j for ith row, jth col
-crow = 300
-ccol = 300
+crow = 400
+ccol = 400
 if 1:
     testdir = './test'
     flist = os.listdir(testdir)
@@ -86,6 +86,8 @@ for mat, func in zip(mats, funcs):
             mat[row, col] = func(row, col)
 
 import numba
+from funcy import print_durations
+
 
 @numba.jit(nogil=True)
 def proc2(i, Lap_u, u):
@@ -100,6 +102,7 @@ def proc2(i, Lap_u, u):
         diff = nu - u[i, j]
         Lap_u[i,j] = u[i, j] + w*diff
 
+@print_durations()
 @numba.jit(nogil=True, nopython = True)
 def Nxt_solver(iter = 100, ):
     w = 1.0
@@ -145,14 +148,16 @@ def Nxt_solver(iter = 100, ):
 
     return Lap_u, None
 
+@print_durations()
+@numba.jit(nogil=True)
 def SOR_solver(dx, iter = 100, w = 1.0,):
     # 对中间点的五点法处理
     # crop 1 pixel
     u = np.zeros((crow, ccol))
     # diff = np.zeros((crow, ccol))
-    diffs = []
+    # diffs = []
 
-    @numba.jit(nogil=True)
+
     def proc(i, u, even):
         # assert( i % 2 == 0 and ccol % 2 == 0)
         for j in range((even+i)%2, ccol, 2):
@@ -291,7 +296,7 @@ if __name__ == "__main__":
             # diffs.append(diff)
             diffs_sor.append(_)
         ux, diffs = Nxt_solver( 3600)
-        uy, _ = SOR_solver( dx, 400, w = 1.7)
+        uy, _ = SOR_solver( dx, 3600, w = 1.7)
         diff_cmp.append(diffs)
         diffs_sor_cmp.append(diffs_sor)
 
