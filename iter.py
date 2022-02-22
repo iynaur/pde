@@ -88,9 +88,12 @@ f = np.ones((crow, ccol))
 #             mat[row, col] = func(row, col)
 
 import numba
-from numba import threading_layer
+from numba import threading_layer, set_num_threads, config
 from funcy import print_durations
-# print("Threading layer chosen: %s" % threading_layer())
+
+# config.THREADING_LAYER = 'tbb'
+
+set_num_threads(3)
 
 @numba.jit(nogil=True, nopython = True)
 def proc2(i, Lap_u, u):
@@ -326,7 +329,7 @@ if __name__ == "__main__":
         uy, _ = SOR_solver(1000, w = 1.7)
         diff_cmp.append(diffs)
         diffs_sor_cmp.append(diffs_sor)
-
+    print("Threading layer chosen: %s" % threading_layer())
 
     X, Y = np.meshgrid(range(ccol), range(crow))
     if 0:
