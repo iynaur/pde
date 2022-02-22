@@ -13,8 +13,8 @@ from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 # a * du2 / d2x + b * du2 / d2y - c *u + d = 0
 
 # i, j for ith row, jth col
-crow = 300
-ccol = 300
+crow = 200
+ccol = 200
 if 1:
     testdir = './test'
     flist = os.listdir(testdir)
@@ -51,9 +51,11 @@ def gb(i, j):
     return 1
 
 def gc(i, j):
+    return 0
     return 2*4*pi**2/crow/ccol
 
 def gdx(i, j):
+    return 1
     # return fabs(i - crow/2) + fabs(j - ccol/2)
     return \
         -((float)(img[i+1,j]) - img[i+1,j+2])/2
@@ -73,8 +75,8 @@ def d(i, j):
 
 a = np.ones((crow, ccol))
 b = np.ones((crow, ccol))
-c = np.ones((crow, ccol)) / 1000
-dx = np.zeros((crow, ccol))
+c = np.zeros((crow, ccol)) / 1000
+dx = np.ones((crow, ccol))
 dy = np.ones((crow, ccol))
 f = np.ones((crow, ccol))
 mats = [dx, f]
@@ -156,20 +158,33 @@ def SOR_solver(iter = 100, w = 1.0,):
     u = np.zeros((crow, ccol))
     # diff = np.zeros((crow, ccol))
     # diffs = []
-
+    candi = [ccol/4, 0]
     # @numba.jit(nogil=True)
     def proc(i, u, even, w):
         # assert( i % 2 == 0 and ccol % 2 == 0)
-        for j in range((even+i)%2, ccol, 2):
-            # for k in range(j**2):
-            #     Lap_u[i,j] += j
+
+        for j in range((even+i+1)%2 + 1, ccol-1, 2):
+            if fabs(i - crow//2) <= crow/4 and fabs(j - ccol//2) in candi:
+                u[i, j] =  500
+                continue
+
             nu = b[i, j]*(u[(i+1)%crow, j] + u[i-1, j]) \
             + a[i,j]*(u[i, (j+1)%ccol] + u[i, j-1]) + dx[i, j]
             nu /= (2*a[i, j] + 2*b[i, j] + c[i, j])
             diff = nu - u[i, j]
             u[i, j] += w*diff
 
+            # # boundray
+            # if i == 0 or i == crow-1 or j ==0 or j==ccol-1:
+            #     u[i, j] = 0
+            # if i == 0 and j==0:
+            #     u[i, j] = 1
 
+    # for row in range(crow):
+    #     u[row, ccol-1] = row / crow
+    # for col in range(ccol):
+    #     u[crow-1, col] = col /ccol
+    # u[crow/2, ccol/2] = 1
     for i in range(iter):
         # u[:] = Lap_u
         if 0:
@@ -179,9 +194,9 @@ def SOR_solver(iter = 100, w = 1.0,):
                 _ = executor.map(proc, range(0, crow), repeat(u), repeat(1))
             # _ = list(_)
         else:
-            for i in range(0, crow):
+            for i in range(1, crow-1):
                 proc(i, u, 0, w)
-            for i in range(0, crow):
+            for i in range(1, crow -1):
                 proc(i, u, 1, w)
             #
         continue
@@ -311,13 +326,13 @@ if __name__ == "__main__":
         plt.show()
 
 
-    uz = fftSolver(f = f) # not acurate for input image not smooth at period bondray
-    ud = fftSolver(dx = dx)
-    for i, u in enumerate([ux, uy, uz, ud]):
+    # uz = fftSolver(f = f) # not acurate for input image not smooth at period bondray
+    # ud = fftSolver(dx = dx)
+    for i, u in enumerate([ux, uy, ]):
         plt.subplot(1, 4, i+1)
         bu = np.real(u)
-        bu = np.append(bu, bu, 0)
-        bu = np.append(bu, bu, 1)
+        # bu = np.append(bu, bu, 0)
+        # bu = np.append(bu, bu, 1)
         if 1: fig = plt.imshow(bu)
         else: fig = plt.imshow(np.real(u - uy))
 
