@@ -13,8 +13,8 @@ from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 # a * du2 / d2x + b * du2 / d2y - c *u + d = 0
 
 # i, j for ith row, jth col
-crow = 1000
-ccol = 2000
+crow = 300
+ccol = 300
 if 1:
     testdir = './test'
     flist = os.listdir(testdir)
@@ -93,7 +93,7 @@ from funcy import print_durations
 
 # config.THREADING_LAYER = 'tbb'
 
-set_num_threads(3)
+set_num_threads(6)
 
 @numba.jit(nogil=True, nopython = True)
 def proc2(i, Lap_u, u):
@@ -159,17 +159,19 @@ def Nxt_solver(iter = 100, ):
 @numba.jit(nogil=True, nopython = True)
 def proc(i, u, even, w):
     # assert( i % 2 == 0 and ccol % 2 == 0)
-
+    madif = 0.0
     for j in range((even+i+1)%2 + 1, ccol-1, 2):
         if fabs(i - crow//2) <= crow/4 and fabs(j - ccol//2) ==0:
-            u[i, j] =  500
+            u[i, j] =  3000
             continue
 
         nu = b[i, j]*(u[(i+1)%crow, j] + u[i-1, j]) \
         + a[i,j]*(u[i, (j+1)%ccol] + u[i, j-1]) + dx[i, j]
         nu /= (2*a[i, j] + 2*b[i, j] + c[i, j])
         diff = nu - u[i, j]
+        madif = max(madif, fabs(diff))
         u[i, j] += w*diff
+    return madif
 
 @print_durations()
 @numba.jit(nogil=True, parallel=True)
@@ -179,7 +181,7 @@ def SOR_solver(iter = 100, w = 1.0,):
     u = np.zeros((crow, ccol))
     # diff = np.zeros((crow, ccol))
     # diffs = []
-    candi = [ccol/4, 0]
+    residuals = np.zeros(iter)
 
 
             # # boundray
@@ -193,7 +195,9 @@ def SOR_solver(iter = 100, w = 1.0,):
     # for col in range(ccol):
     #     u[crow-1, col] = col /ccol
     # u[crow/2, ccol/2] = 1
-    for i in range(iter):
+    # madiff = np.zeros(crow)
+    for ii in range(iter):
+        madiff = np.zeros(crow)
         # u[:] = Lap_u
         if 0:
             with ThreadPoolExecutor(max_workers=4) as executor:
@@ -205,15 +209,16 @@ def SOR_solver(iter = 100, w = 1.0,):
             # numba.prange
             if 0:
                 for i in range(1, crow-1):
-                    proc(i, u, 0, w)
+                    madiff[i] =  proc(i, u, 0, w)
                 for i in range(1, crow -1):
-                    proc(i, u, 1, w)
+                    madiff[i] = max(madiff[i], proc(i, u, 1, w))
             else:
                 for i in numba.prange(1, crow-1):
-                    proc(i, u, 0, w)
+                    madiff[i] =  proc(i, u, 0, w)
                 for i in numba.prange(1, crow -1):
-                    proc(i, u, 1, w)
+                    madiff[i] = max(madiff[i], proc(i, u, 1, w))
             #
+        residuals[ii] = np.max(madiff)
         continue
 
         Lap_u = Lap_u / (2*a + 2*b + c)
@@ -224,7 +229,7 @@ def SOR_solver(iter = 100, w = 1.0,):
         diffs.append(diff)
         # u, Lap_u = Lap_u, u
 
-    return u, None
+    return u, residuals
 
 
 def Nxt_SOR(u, d, w = 1.0):
@@ -326,8 +331,9 @@ if __name__ == "__main__":
             # diffs.append(diff)
             diffs_sor.append(_)
         # ux, diffs = Nxt_solver( 360)
-        uy, _ = SOR_solver(1000, w = 1.7)
-        diff_cmp.append(diffs)
+        for w in np.linspace(1.0, 1.9, 10):
+            uy, resid = SOR_solver(5000, w )
+            diff_cmp.append(resid)
         diffs_sor_cmp.append(diffs_sor)
     print("Threading layer chosen: %s" % threading_layer())
 
@@ -357,11 +363,11 @@ if __name__ == "__main__":
         # b = plt.contour(X, Y, u, 3, colors='black', linewidths=1, linestyles='solid')
         plt.colorbar(fig)
         fig.set_cmap('jet') # 'plasma' or 'viridis'
-    plt.show()
-    exit(0)
+    # plt.show()
+    # exit(0)
     plt.subplot(133)
     for diffs in diff_cmp:
         plt.plot(diffs)
-    for diffs in diffs_sor_cmp:
-        plt.plot(diffs)
+    # for diffs in diffs_sor_cmp:
+    #     plt.plot(diffs)
     plt.show()
