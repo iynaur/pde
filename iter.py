@@ -3,7 +3,7 @@ from math import *
 from typing import NoReturn
 import numpy as np
 import matplotlib.pyplot as plt
-plt.switch_backend('Qt5Agg')
+# plt.switch_backend('Qt5Agg')
 
 import cv2
 import sys, os
@@ -13,8 +13,8 @@ from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 # a * du2 / d2x + b * du2 / d2y - c *u + d = 0
 
 # i, j for ith row, jth col
-crow = 200
-ccol = 200
+crow = 1000
+ccol = 2000
 if 1:
     testdir = './test'
     flist = os.listdir(testdir)
@@ -79,22 +79,24 @@ c = np.zeros((crow, ccol)) / 1000
 dx = np.ones((crow, ccol))
 dy = np.ones((crow, ccol))
 f = np.ones((crow, ccol))
-mats = [dx, f]
-funcs = [gdx, d]
+# mats = [dx, f]
+# funcs = [gdx, d]
 
-for mat, func in zip(mats, funcs):
-    for row in range(crow):
-        for col in range(ccol):
-            mat[row, col] = func(row, col)
+# for mat, func in zip(mats, funcs):
+#     for row in range(crow):
+#         for col in range(ccol):
+#             mat[row, col] = func(row, col)
 
 import numba
+from numba import threading_layer
 from funcy import print_durations
+# print("Threading layer chosen: %s" % threading_layer())
 
-
-@numba.jit(nogil=True)
+@numba.jit(nogil=True, nopython = True)
 def proc2(i, Lap_u, u):
     w = 1.0
     # print(w)
+    # for j in numba.prange(0, ccol):
     for j in range(0, ccol):
         # for k in range(j**2):
         #     Lap_u[i,j] += j
@@ -126,6 +128,7 @@ def Nxt_solver(iter = 100, ):
             pass
         else:
             for i in range(0, crow):
+            # for i in numba.prange(0, crow):
                 proc2(i, Lap_u, u)
                 continue
                 for j in range(0, ccol):
@@ -150,8 +153,23 @@ def Nxt_solver(iter = 100, ):
 
     return Lap_u, None
 
+@numba.jit(nogil=True, nopython = True)
+def proc(i, u, even, w):
+    # assert( i % 2 == 0 and ccol % 2 == 0)
+
+    for j in range((even+i+1)%2 + 1, ccol-1, 2):
+        if fabs(i - crow//2) <= crow/4 and fabs(j - ccol//2) ==0:
+            u[i, j] =  500
+            continue
+
+        nu = b[i, j]*(u[(i+1)%crow, j] + u[i-1, j]) \
+        + a[i,j]*(u[i, (j+1)%ccol] + u[i, j-1]) + dx[i, j]
+        nu /= (2*a[i, j] + 2*b[i, j] + c[i, j])
+        diff = nu - u[i, j]
+        u[i, j] += w*diff
+
 @print_durations()
-@numba.jit(nogil=True)
+@numba.jit(nogil=True, parallel=True)
 def SOR_solver(iter = 100, w = 1.0,):
     # 对中间点的五点法处理
     # crop 1 pixel
@@ -159,20 +177,7 @@ def SOR_solver(iter = 100, w = 1.0,):
     # diff = np.zeros((crow, ccol))
     # diffs = []
     candi = [ccol/4, 0]
-    # @numba.jit(nogil=True)
-    def proc(i, u, even, w):
-        # assert( i % 2 == 0 and ccol % 2 == 0)
 
-        for j in range((even+i+1)%2 + 1, ccol-1, 2):
-            if fabs(i - crow//2) <= crow/4 and fabs(j - ccol//2) in candi:
-                u[i, j] =  500
-                continue
-
-            nu = b[i, j]*(u[(i+1)%crow, j] + u[i-1, j]) \
-            + a[i,j]*(u[i, (j+1)%ccol] + u[i, j-1]) + dx[i, j]
-            nu /= (2*a[i, j] + 2*b[i, j] + c[i, j])
-            diff = nu - u[i, j]
-            u[i, j] += w*diff
 
             # # boundray
             # if i == 0 or i == crow-1 or j ==0 or j==ccol-1:
@@ -194,10 +199,17 @@ def SOR_solver(iter = 100, w = 1.0,):
                 _ = executor.map(proc, range(0, crow), repeat(u), repeat(1))
             # _ = list(_)
         else:
-            for i in range(1, crow-1):
-                proc(i, u, 0, w)
-            for i in range(1, crow -1):
-                proc(i, u, 1, w)
+            # numba.prange
+            if 0:
+                for i in range(1, crow-1):
+                    proc(i, u, 0, w)
+                for i in range(1, crow -1):
+                    proc(i, u, 1, w)
+            else:
+                for i in numba.prange(1, crow-1):
+                    proc(i, u, 0, w)
+                for i in numba.prange(1, crow -1):
+                    proc(i, u, 1, w)
             #
         continue
 
@@ -209,7 +221,7 @@ def SOR_solver(iter = 100, w = 1.0,):
         diffs.append(diff)
         # u, Lap_u = Lap_u, u
 
-    return u, diffs
+    return u, None
 
 
 def Nxt_SOR(u, d, w = 1.0):
@@ -310,8 +322,8 @@ if __name__ == "__main__":
             uy, _ = Nxt_SOR(uy, dx, w = 1.5)
             # diffs.append(diff)
             diffs_sor.append(_)
-        ux, diffs = Nxt_solver( 3600)
-        uy, _ = SOR_solver(3600, w = 1.7)
+        # ux, diffs = Nxt_solver( 360)
+        uy, _ = SOR_solver(1000, w = 1.7)
         diff_cmp.append(diffs)
         diffs_sor_cmp.append(diffs_sor)
 
@@ -328,7 +340,7 @@ if __name__ == "__main__":
 
     # uz = fftSolver(f = f) # not acurate for input image not smooth at period bondray
     # ud = fftSolver(dx = dx)
-    for i, u in enumerate([ux, uy, ]):
+    for i, u in enumerate([ uy, ]):
         plt.subplot(1, 4, i+1)
         bu = np.real(u)
         # bu = np.append(bu, bu, 0)
