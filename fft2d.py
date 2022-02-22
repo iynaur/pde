@@ -122,8 +122,8 @@ if __name__ == "__main__":
 
     # fft ups
     upsfft = np.zeros((crow* ups, ccol* ups), dtype=np.complex_)
-    hrow = crow//2
-    hcol = ccol //2
+    hrow = crow - crow//2
+    hcol = ccol - ccol //2
     upsfft[:hrow, :hcol] = fft[:hrow, :hcol]
     upsfft[-(crow - hrow):, -(ccol - hcol):] = fft[-(crow - hrow):, -(ccol - hcol):]
     upsfft[-(crow - hrow):, :hcol] = fft[-(crow - hrow):, :hcol]
