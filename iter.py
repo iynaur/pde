@@ -331,8 +331,8 @@ if __name__ == "__main__":
             # diffs.append(diff)
             diffs_sor.append(_)
         # ux, diffs = Nxt_solver( 360)
-        for w in np.linspace(1.0, 1.9, 10):
-            uy, resid = SOR_solver(5000, w )
+        for r in range(5):
+            uy, resid = SOR_solver(5000, w = 1.8 )
             diff_cmp.append(resid)
         diffs_sor_cmp.append(diffs_sor)
     print("Threading layer chosen: %s" % threading_layer())
