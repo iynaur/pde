@@ -174,7 +174,7 @@ def proc(i, u, even, w):
     return madif
 
 @print_durations()
-@numba.jit(nogil=True, parallel=True)
+@numba.jit(nogil=True, parallel=dict(prange=True, fusion=False))
 def SOR_solver(iter = 100, w = 1.0,):
     # 对中间点的五点法处理
     # crop 1 pixel
@@ -195,11 +195,12 @@ def SOR_solver(iter = 100, w = 1.0,):
     # for col in range(ccol):
     #     u[crow-1, col] = col /ccol
     # u[crow/2, ccol/2] = 1
-    # madiff = np.zeros(crow)
+    madiff = np.zeros(crow)
     for ii in range(iter):
-        madiff = np.zeros(crow)
+        # madiff = np.zeros(crow)
+        madiff *= 0
         # u[:] = Lap_u
-        if 0:
+        if False:
             with ThreadPoolExecutor(max_workers=4) as executor:
                 _ = executor.map(proc, range(0, crow), repeat(u), repeat(0))
             with ThreadPoolExecutor(max_workers=4) as executor:
@@ -207,7 +208,7 @@ def SOR_solver(iter = 100, w = 1.0,):
             # _ = list(_)
         else:
             # numba.prange
-            if 0:
+            if False:
                 for i in range(1, crow-1):
                     madiff[i] =  proc(i, u, 0, w)
                 for i in range(1, crow -1):
