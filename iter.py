@@ -1,5 +1,6 @@
 from itertools import repeat
 from math import *
+import random
 from typing import NoReturn
 import numpy as np
 import matplotlib.pyplot as plt
@@ -55,7 +56,6 @@ def gc(i, j):
     return 2*4*pi**2/crow/ccol
 
 def gdx(i, j):
-    return 1
     # return fabs(i - crow/2) + fabs(j - ccol/2)
     return \
         -((float)(img[i+1,j]) - img[i+1,j+2])/2
@@ -73,14 +73,14 @@ def d(i, j):
     return \
         (float)(img[i+1,j+1])
 
-a = np.ones((crow, ccol))
+a = np.ones((crow, ccol)) * 2
 b = np.ones((crow, ccol))
-c = np.zeros((crow, ccol)) / 1000
-dx = np.ones((crow, ccol))
+c = np.ones((crow, ccol)) / 300
+dx = np.zeros((crow, ccol))
 dy = np.ones((crow, ccol))
 f = np.ones((crow, ccol))
-# mats = [dx, f]
-# funcs = [gdx, d]
+mats = [dx, f]
+funcs = [gdx, d]
 
 # for mat, func in zip(mats, funcs):
 #     for row in range(crow):
@@ -161,9 +161,9 @@ def proc(i, u, even, w):
     # assert( i % 2 == 0 and ccol % 2 == 0)
     madif = 0.0
     for j in range((even+i+1)%2 + 1, ccol-1, 2):
-        if fabs(i - crow//2) <= crow/4 and fabs(j - ccol//2) ==0:
-            u[i, j] =  3000
-            continue
+        # if fabs(i - crow//2) <= crow/4 and fabs(j - ccol//2) ==0:
+        #     u[i, j] =  1000
+        #     continue
 
         nu = b[i, j]*(u[(i+1)%crow, j] + u[i-1, j]) \
         + a[i,j]*(u[i, (j+1)%ccol] + u[i, j-1]) + dx[i, j]
@@ -190,11 +190,13 @@ def SOR_solver(iter = 100, w = 1.0,):
             # if i == 0 and j==0:
             #     u[i, j] = 1
 
-    # for row in range(crow):
-    #     u[row, ccol-1] = row / crow
-    # for col in range(ccol):
-    #     u[crow-1, col] = col /ccol
-    # u[crow/2, ccol/2] = 1
+    for row in range(crow):
+        u[row, ccol-1] = random.random() *2-1
+        u[row, 0] = -1
+    for col in range(ccol):
+        u[crow-1, col] = col /ccol * 2 - 1
+        u[0, col] = col /ccol * 2 - 1
+    u[crow//2, 0] = -1
     madiff = np.zeros(crow)
     for ii in range(iter):
         # madiff = np.zeros(crow)
@@ -332,7 +334,7 @@ if __name__ == "__main__":
             # diffs.append(diff)
             diffs_sor.append(_)
         # ux, diffs = Nxt_solver( 360)
-        for r in range(5):
+        for r in range(1):
             uy, resid = SOR_solver(5000, w = 1.8 )
             diff_cmp.append(resid)
         diffs_sor_cmp.append(diffs_sor)
@@ -349,10 +351,13 @@ if __name__ == "__main__":
 
 
     # uz = fftSolver(f = f) # not acurate for input image not smooth at period bondray
-    # ud = fftSolver(dx = dx)
-    for i, u in enumerate([ uy, ]):
-        plt.subplot(1, 4, i+1)
-        bu = np.real(u)
+    ud = fftSolver(dx = dx)
+
+    toplot = [ uy, ]
+    for i, u in enumerate(toplot):
+        cnt = len(toplot)
+        plt.subplot(1, cnt+1, i+1)
+        bu = (np.real(u))
         # bu = np.append(bu, bu, 0)
         # bu = np.append(bu, bu, 1)
         if 1: fig = plt.imshow(bu)
@@ -366,7 +371,7 @@ if __name__ == "__main__":
         fig.set_cmap('jet') # 'plasma' or 'viridis'
     # plt.show()
     # exit(0)
-    plt.subplot(133)
+    plt.subplot(1, cnt+1, cnt+1)
     for diffs in diff_cmp:
         plt.plot(diffs)
     # for diffs in diffs_sor_cmp:
