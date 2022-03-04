@@ -1,7 +1,7 @@
 from itertools import repeat
 from math import *
 import random
-from typing import NoReturn
+from typing import DefaultDict, NoReturn
 import numpy as np
 import matplotlib.pyplot as plt
 # plt.switch_backend('Qt5Agg')
@@ -14,8 +14,8 @@ from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 # a * du2 / d2x + b * du2 / d2y - c *u + d = 0
 
 # i, j for ith row, jth col
-crow = 300
-ccol = 300
+crow = 200
+ccol = 600
 if 1:
     testdir = './test'
     flist = os.listdir(testdir)
@@ -45,11 +45,20 @@ else:
 # plt.imshow(img)
 # plt.show()
 
+a = np.ones((crow, ccol)) * 2
+b = np.ones((crow, ccol))
+c = np.ones((crow, ccol)) * 0
+dx = np.zeros((crow, ccol))
+dy = np.ones((crow, ccol))
+f = np.ones((crow, ccol))
+denmin = 1
 def ga(i, j):
-    return 1
+    if i > 100: return a[i,j]*denmin
+    return a[i,j]
 
 def gb(i, j):
-    return 1
+    if i > 100: return b[i,j]*denmin
+    return b[i,j]
 
 def gc(i, j):
     return 0
@@ -57,6 +66,13 @@ def gc(i, j):
 
 def gdx(i, j):
     # return fabs(i - crow/2) + fabs(j - ccol/2)
+    if ccol * 0.25 < j <= ccol * 0.375:
+        if i > 100: return denmin
+        return 1
+    elif ccol * 0.375 < j < ccol * 0.5:
+        return -1
+    else:
+        return 0
     return \
         -((float)(img[i+1,j]) - img[i+1,j+2])/2
     #     (i- crow / 2)  \
@@ -73,19 +89,14 @@ def d(i, j):
     return \
         (float)(img[i+1,j+1])
 
-a = np.ones((crow, ccol)) * 2
-b = np.ones((crow, ccol))
-c = np.ones((crow, ccol)) / 300
-dx = np.zeros((crow, ccol))
-dy = np.ones((crow, ccol))
-f = np.ones((crow, ccol))
-mats = [dx, f]
-funcs = [gdx, d]
 
-# for mat, func in zip(mats, funcs):
-#     for row in range(crow):
-#         for col in range(ccol):
-#             mat[row, col] = func(row, col)
+mats = [a, b, dx, f]
+funcs = [ga, gb, gdx, d]
+
+for mat, func in zip(mats, funcs):
+    for row in range(crow):
+        for col in range(ccol):
+            mat[row, col] = func(row, col)
 
 import numba
 from numba import threading_layer, set_num_threads, config
@@ -174,7 +185,7 @@ def proc(i, u, even, w):
     return madif
 
 @print_durations()
-@numba.jit(nogil=True, parallel=dict(prange=True, fusion=False))
+@numba.jit(nogil=True, parallel=dict(prange=True, fusion=False), cache=False)
 def SOR_solver(iter = 100, w = 1.0,):
     # 对中间点的五点法处理
     # crop 1 pixel
@@ -190,13 +201,13 @@ def SOR_solver(iter = 100, w = 1.0,):
             # if i == 0 and j==0:
             #     u[i, j] = 1
 
-    for row in range(crow):
-        u[row, ccol-1] = random.random() *2-1
-        u[row, 0] = -1
+    # for row in range(crow):
+    #     u[row, ccol-1] = random.random() *2-1
+    #     u[row, 0] = -1
     for col in range(ccol):
-        u[crow-1, col] = col /ccol * 2 - 1
-        u[0, col] = col /ccol * 2 - 1
-    u[crow//2, 0] = -1
+        u[crow-1, col] = 0
+        u[0, col] = 0
+    # u[crow//2, 0] = -1
     madiff = np.zeros(crow)
     for ii in range(iter):
         # madiff = np.zeros(crow)
@@ -218,7 +229,7 @@ def SOR_solver(iter = 100, w = 1.0,):
             else:
                 for i in numba.prange(1, crow-1):
                     madiff[i] =  proc(i, u, 0, w)
-                for i in numba.prange(1, crow -1):
+                for i in numba.prange(1, crow-1 ):
                     madiff[i] = max(madiff[i], proc(i, u, 1, w))
             #
         residuals[ii] = np.max(madiff)
@@ -335,7 +346,7 @@ if __name__ == "__main__":
             diffs_sor.append(_)
         # ux, diffs = Nxt_solver( 360)
         for r in range(1):
-            uy, resid = SOR_solver(5000, w = 1.8 )
+            uy, resid = SOR_solver(12000, w = 1.3 )
             diff_cmp.append(resid)
         diffs_sor_cmp.append(diffs_sor)
     print("Threading layer chosen: %s" % threading_layer())
@@ -351,7 +362,7 @@ if __name__ == "__main__":
 
 
     # uz = fftSolver(f = f) # not acurate for input image not smooth at period bondray
-    ud = fftSolver(dx = dx)
+    # ud = fftSolver(dx = dx)
 
     toplot = [ uy, ]
     for i, u in enumerate(toplot):
@@ -376,4 +387,31 @@ if __name__ == "__main__":
         plt.plot(diffs)
     # for diffs in diffs_sor_cmp:
     #     plt.plot(diffs)
+    plt.show()
+
+    # mp = DefaultDict(list)
+    hz = []
+    for row in range(1, crow-1 ):
+        mp = []
+
+        for col in range(100, 350):
+            pass
+            h = row
+            dist = u[row][col]
+            u2 = u[row+1][col] + u[row-1][col] - 2* u[row][col]
+            mp.append([dist, u2])
+        mph = np.array(mp)
+        if row < 5 or row % 20 == 0:
+            plt.plot(mph[:,0], mph[:,1])
+            plt.show()
+        linear_model=np.polyfit(mph[:,0], mph[:,1],1)
+        # linear_model_fn=np.poly1d(linear_model)
+        print(linear_model)
+        hz.append(-linear_model[0])
+    plt.plot(hz)
+    plt.show()
+
+    # //guess
+    hz = [ hz[i] * (i+1) * (i+1)for i in range(len(hz))]
+    plt.plot(hz)
     plt.show()
